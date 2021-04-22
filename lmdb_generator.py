@@ -64,7 +64,7 @@ def test_lmdb_builder(adslabs_list, lmdb_path):
             suffix = adslabs_list[idx].suffix
         except AttributeError:
             suffix = None
-        idx_to_sys_dict[idx] = [fid_writer(adslabs_list[idx], suffix=suffix), all_adslabs[idx].to_json()]
+        idx_to_sys_dict[idx] = [fid_writer(adslabs_list[idx], suffix=suffix), adslabs_list[idx].to_json()]
         # no neighbor edge case check
         if dat.edge_index.shape[1] == 0:
             print("no neighbors")
