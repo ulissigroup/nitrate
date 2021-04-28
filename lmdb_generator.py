@@ -59,7 +59,10 @@ def test_lmdb_builder(adslabs_list, lmdb_path):
         del dat.y
         dat.y_relaxed = None
         dat.pos_relaxed = dat.pos
-        dat.sid = idx
+        try:
+            dat.sid = adslabs_list.idx
+        except AttributeError:
+            dat.sid = idx
         try:
             suffix = adslabs_list[idx].suffix
         except AttributeError:
