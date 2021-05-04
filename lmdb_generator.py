@@ -6,7 +6,6 @@ import lmdb
 import pickle
 import torch
 
-
 def read_trajectory_extract_features(a2g, adslabs_list):
     tags_dict = {"subsurface": 2, 'surface': 1, 'adsorbate': 0}
     adaptor = AseAtomsAdaptor()
@@ -60,14 +59,13 @@ def test_lmdb_builder(adslabs_list, lmdb_path):
         dat.y_relaxed = None
         dat.pos_relaxed = dat.pos
         try:
-            dat.sid = adslabs_list.idx
-        except AttributeError:
-            dat.sid = idx
-        try:
             suffix = adslabs_list[idx].suffix
         except AttributeError:
             suffix = None
-        idx_to_sys_dict[idx] = [fid_writer(adslabs_list[idx], suffix=suffix), adslabs_list[idx].to_json()]
+        name = fid_writer(adslabs_list[idx], suffix=suffix)
+        dat.sid = adslabs_list[idx].sid
+        dat.name = name
+        idx_to_sys_dict[idx] = [name, adslabs_list[idx].to_json()]
         # no neighbor edge case check
         if dat.edge_index.shape[1] == 0:
             print("no neighbors")

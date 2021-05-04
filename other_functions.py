@@ -20,4 +20,4 @@ def pourbaix_stable(all_entries, mprester=None):
         mpid = entry.data['material_id']
         if mpid in mpids:
             stable_entries.append(entry)
-:
+    return stable_entries
