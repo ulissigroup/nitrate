@@ -1,6 +1,11 @@
-from pymatgen import Composition
-from ocpmodels.preprocessing import AtomsToGraphs
+from pymatgen import Composition, Structure
 from pymatgen.io.ase import AseAtomsAdaptor
+from ocpmodels.preprocessing import AtomsToGraphs
+from ocpmodels.datasets.trajectory_lmdb import TrajectoryLmdbDataset
+import sys, os
+sys.path.append(os.getcwd())
+from other_functions import str_to_hkl
+
 
 import lmdb
 import pickle
@@ -80,3 +85,49 @@ def test_lmdb_builder(adslabs_list, lmdb_path):
 
     db.close()
     return idx_to_sys_dict
+
+
+def write_(lmdb_dir, checkpoints_dir, get_struct_dict=False):
+
+    # load predicted adsorption energies
+    edict = {}
+    for f in glob.glob(os.path.join(checkpoints_dir, '*')):
+        res = np.load(os.path.join(f, 'is2re_predictions.npz'))
+        for i, ids in enumerate(res.get('ids')):
+            edict[int(res.get('ids')[i])] = res.get('energy')[i]
+
+    traj_lmdb = TrajectoryLmdbDataset({"src": lmdb_dir})
+
+    ads_dict, struct_dict = {}, {}
+    for dat in traj_lmdb:
+
+        sid = dat.sid
+        name = dat.name.split('_')
+        formula, hkl, ads, mpid = name[0], str_to_hkl(name[1]), name[2], name[-1]
+        n = '%s_%s' % (formula, mpid)
+        if n not in ads_dict.keys():
+            ads_dict[n] = {}
+        if hkl not in ads_dict[n].keys():
+            ads_dict[n][hkl] = {'N': [], 'O': []}
+        ads_dict[n][hkl][ads].append(edict[str(sid)])
+
+        if get_struct_dict:
+            if n not in struct_dict.keys():
+                struct_dict[n] = {}
+            if hkl not in struct_dict[n].keys():
+                struct_dict[n][hkl] = {'N': [], 'O': []}
+
+            slab = Structure(Lattice(dat.cell), dat.atomic_numbers,
+                             dat.pos, coords_are_cartesian=True)
+            struct_dict[n][hkl][ads].append(slab.as_dict())
+
+    for n in ads_dict.keys():
+        for hkl in ads_dict[n].keys():
+            for ads in ads_dict[n][hkl].keys():
+                i = ads_dict[n][hkl][ads].index(min(ads_dict[n][hkl][ads]))
+                struct_dict[n][hkl][ads] = struct_dict[n][hkl][ads][i]
+
+    if get_struct_dict:
+        return ads_dict, struct_dict
+    else:
+        return ads_dict
