@@ -87,7 +87,7 @@ def test_lmdb_builder(adslabs_list, lmdb_path):
     return idx_to_sys_dict
 
 
-def write_(lmdb_dir, checkpoints_dir, get_struct_dict=False):
+def get_prediction_dicts(lmdb_dir, checkpoints_dir, get_struct_dict=False):
 
     # load predicted adsorption energies
     edict = {}
