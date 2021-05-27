@@ -87,14 +87,92 @@ def test_lmdb_builder(adslabs_list, lmdb_path):
     return idx_to_sys_dict
 
 
-def get_prediction_dicts(lmdb_dir, checkpoints_dir, get_struct_dict=False):
+from pymatgen import Molecule
+from pymatgen.analysis.adsorption import AdsorbateSiteFinder
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+import time
+
+sys.path.append(os.getcwd())
+sys.path.append('/home/jovyan/repos/mo-wulff-workflow/')
+from surface import *
+
+O = Molecule(['O'], [[0, 0, 0]])
+N = Molecule(['N'], [[0, 0, 0]])
+ads_dict = {"*O": O, "*N": N}
+
+def generate_multiple_lmdbs(entries_list, lmdb_dir):
+
+    count = 0
+    sid = 0
+    all_adslabs = []
+
+    for j, entry in enumerate(entries_list):
+
+        tstart = time.time()
+        s = entry.structure
+        sg = SpacegroupAnalyzer(s)
+        s = sg.get_conventional_standard_structure()
+        if sg.get_crystal_system() in ['hexagonal', 'cubic']:
+            mmi = 2
+        else:
+            mmi = 1
+
+        mmi = 1 if len(s) > 10 else mmi
+        if len(s) > 24:
+            all_slabs = []
+            for hkl in get_symmetrically_distinct_miller_indices(s, mmi):
+                slabgen = SlabGenerator(s, hkl, 4, 8, lll_reduce=True, center_slab=True, in_unit_planes=True)
+                all_slabs.append(slabgen.get_slab())
+        else:
+            all_slabs = generate_all_slabs(s, mmi, 4, 8, lll_reduce=True, center_slab=True, in_unit_planes=True)
+
+        print(len(s), sg.get_crystal_system(), entry.composition.reduced_formula, mmi, len(all_slabs))
+
+        for i, slab in enumerate(all_slabs):
+            if len(slab) > 300:
+                continue
+            adslabgen = AdsorbateSiteFinder(slab)
+            adslabs = adslabgen.generate_adsorption_structures(ads_dict['*O'], min_lw=8)
+            for ii, adslab in enumerate(adslabs):
+
+                setattr(adslab, 'suffix', '%s_slab_%s_%s' % (ii, i, entry.entry_id))
+                setattr(adslab, 'sid', sid)
+                count += 1
+                sid += 1
+                if len(adslab) < 800:
+                    all_adslabs.append(adslab)
+
+                adslab2 = adslab.copy()
+                adslab2.replace(-1, 'N')
+                setattr(adslab2, 'suffix', '%s_slab_%s_%s' % (ii, i, entry.entry_id))
+                setattr(adslab2, 'sid', sid)
+                count += 1
+                sid += 1
+                adslab2.add_site_property('surface_properties',
+                                          adslab.site_properties['surface_properties'])
+                if len(adslab) < 800:
+                    all_adslabs.append(adslab2)
+
+        tend = time.time()
+        print(len(all_slabs), len(all_adslabs), tend - tstart, j)
+
+        if count > 4000:
+            print('max slab size', max([len(slab) for slab in all_adslabs]))
+            test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (count)))
+            all_adslabs = []
+            count = 0
+
+
+def get_eads_dicts(lmdb_dir, checkpoints_dir, get_struct_dict=False):
 
     # load predicted adsorption energies
-    edict = {}
-    for f in glob.glob(os.path.join(checkpoints_dir, '*')):
-        res = np.load(os.path.join(f, 'is2re_predictions.npz'))
-        for i, ids in enumerate(res.get('ids')):
-            edict[int(res.get('ids')[i])] = res.get('energy')[i]
+    all_eads_name = {}
+    count = 0
+    for cpt in glob.glob(os.path.jon(checkpoints_dir, '*')):
+        checkpoints = np.load(os.path.join(cpt, 'is2re_predictions.npz'))
+        count += len(checkpoints.get('ids'))
+        for i, idx in enumerate(checkpoints.get('ids')):
+            all_eads_name[int(idx)] = checkpoints.get('energy')[i]
 
     traj_lmdb = TrajectoryLmdbDataset({"src": lmdb_dir})
 
@@ -102,14 +180,14 @@ def get_prediction_dicts(lmdb_dir, checkpoints_dir, get_struct_dict=False):
     for dat in traj_lmdb:
 
         sid = dat.sid
-        name = dat.name.split('_')
-        formula, hkl, ads, mpid = name[0], str_to_hkl(name[1]), name[2], name[-1]
-        n = '%s_%s' % (formula, mpid)
+        formula, hkl, ads, nads, r, nslab, entry_id = dat.name.split('_')
+        hkl = str(str_to_hkl(hkl))
+        n = '%s_%s' % (formula, entry_id)
         if n not in ads_dict.keys():
             ads_dict[n] = {}
         if hkl not in ads_dict[n].keys():
             ads_dict[n][hkl] = {'N': [], 'O': []}
-        ads_dict[n][hkl][ads].append(edict[str(sid)])
+        ads_dict[n][hkl][ads].append(all_eads_name[sid])
 
         if get_struct_dict:
             if n not in struct_dict.keys():
@@ -120,12 +198,6 @@ def get_prediction_dicts(lmdb_dir, checkpoints_dir, get_struct_dict=False):
             slab = Structure(Lattice(dat.cell), dat.atomic_numbers,
                              dat.pos, coords_are_cartesian=True)
             struct_dict[n][hkl][ads].append(slab.as_dict())
-
-    for n in ads_dict.keys():
-        for hkl in ads_dict[n].keys():
-            for ads in ads_dict[n][hkl].keys():
-                i = ads_dict[n][hkl][ads].index(min(ads_dict[n][hkl][ads]))
-                struct_dict[n][hkl][ads] = struct_dict[n][hkl][ads][i]
 
     if get_struct_dict:
         return ads_dict, struct_dict
