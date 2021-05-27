@@ -78,7 +78,7 @@ def test_lmdb_builder(adslabs_list, lmdb_path):
 
         # Write to LMDB
         txn = db.begin(write=True)
-        txn.put(f"{idx}".encode("ascii"), pickle.dumps(dat, protocol=-1))
+        txn.put(f"{int(dat.sid)}".encode("ascii"), pickle.dumps(dat, protocol=-1))
         txn.commit()
         db.sync()
         idx += 1
