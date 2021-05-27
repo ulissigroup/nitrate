@@ -168,7 +168,7 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir, get_struct_dict=False):
     # load predicted adsorption energies
     all_eads_name = {}
     count = 0
-    for cpt in glob.glob(os.path.jon(checkpoints_dir, '*')):
+    for cpt in glob.glob(os.path.join(checkpoints_dir, '*')):
         checkpoints = np.load(os.path.join(cpt, 'is2re_predictions.npz'))
         count += len(checkpoints.get('ids'))
         for i, idx in enumerate(checkpoints.get('ids')):
