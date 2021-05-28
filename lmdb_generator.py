@@ -2,6 +2,7 @@ from pymatgen import Composition, Structure
 from pymatgen.io.ase import AseAtomsAdaptor
 from ocpmodels.preprocessing import AtomsToGraphs
 from ocpmodels.datasets.trajectory_lmdb import TrajectoryLmdbDataset
+from single_point_lmdb import SinglePointLmdbDataset
 import sys, os, glob
 sys.path.append(os.getcwd())
 from other_functions import str_to_hkl
@@ -136,21 +137,21 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir):
 
                 setattr(adslab, 'suffix', '%s_slab_%s_%s' % (ii, i, entry.entry_id))
                 setattr(adslab, 'sid', sid)
-                count += 1
-                sid += 1
                 if len(adslab) < 800:
                     all_adslabs.append(adslab)
+                    count += 1
+                    sid += 1
 
                 adslab2 = adslab.copy()
                 adslab2.replace(-1, 'N')
                 setattr(adslab2, 'suffix', '%s_slab_%s_%s' % (ii, i, entry.entry_id))
                 setattr(adslab2, 'sid', sid)
-                count += 1
-                sid += 1
                 adslab2.add_site_property('surface_properties',
                                           adslab.site_properties['surface_properties'])
                 if len(adslab) < 800:
                     all_adslabs.append(adslab2)
+                    count += 1
+                    sid += 1
 
         tend = time.time()
         print(len(all_slabs), len(all_adslabs), tend - tstart, j)
@@ -162,43 +163,28 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir):
             count = 0
 
 
-def get_eads_dicts(lmdb_dir, checkpoints_dir, get_struct_dict=False):
+def get_eads_dicts(lmdb_dir, checkpoints_dir):
 
     # load predicted adsorption energies
-    all_eads_name = {}
-    count = 0
+    ads_dict = {}
     for cpt in glob.glob(os.path.join(checkpoints_dir, '*')):
         checkpoints = np.load(os.path.join(cpt, 'is2re_predictions.npz'))
-        count += len(checkpoints.get('ids'))
-        for i, idx in enumerate(checkpoints.get('ids')):
-            all_eads_name[int(idx)] = checkpoints.get('energy')[i]
 
-    traj_lmdb = TrajectoryLmdbDataset({"src": lmdb_dir})
+        count = len(checkpoints.get('ids'))
+        single_traj = SinglePointLmdbDataset({"src": os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (count))})
+        idx_list, eads_list = zip(*sorted(zip(checkpoints.get('ids'), checkpoints.get('energy'))))
 
-    ads_dict, struct_dict = {}, {}
-    for dat in traj_lmdb:
+        for i, eads in enumerate(eads_list):
 
-        sid = dat.sid
-        formula, hkl, ads, nads, r, nslab, entry_id = dat.name.split('_')
-        hkl = str(str_to_hkl(hkl))
-        n = '%s_%s' % (formula, entry_id)
-        if n not in ads_dict.keys():
-            ads_dict[n] = {}
-        if hkl not in ads_dict[n].keys():
-            ads_dict[n][hkl] = {'N': [], 'O': []}
-        ads_dict[n][hkl][ads].append(all_eads_name[sid])
-
-        if get_struct_dict:
-            if n not in struct_dict.keys():
-                struct_dict[n] = {}
-            if hkl not in struct_dict[n].keys():
-                struct_dict[n][hkl] = {'N': [], 'O': []}
-
-            slab = Structure(Lattice(dat.cell), dat.atomic_numbers,
-                             dat.pos, coords_are_cartesian=True)
-            struct_dict[n][hkl][ads].append(slab.as_dict())
-
-    if get_struct_dict:
-        return ads_dict, struct_dict
-    else:
-        return ads_dict
+            dat = single_traj[i]
+            sid = dat.sid
+            formula, hkl, ads, nads, r, nslab, entry_id = dat.name.split('_')
+            hkl = str(str_to_hkl(hkl))
+            n = '%s_%s' % (formula, entry_id)
+            if n not in ads_dict.keys():
+                ads_dict[n] = {}
+            if hkl not in ads_dict[n].keys():
+                ads_dict[n][hkl] = {'N': [], 'O': []}
+            ads_dict[n][hkl][ads].append(all_eads_name[sid])
+    
+    return ads_dict
