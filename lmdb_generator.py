@@ -166,12 +166,22 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir):
 def get_eads_dicts(lmdb_dir, checkpoints_dir):
 
     # load predicted adsorption energies
-    ads_dict = {}
-    for cpt in glob.glob(os.path.join(checkpoints_dir, '*')):
-        checkpoints = np.load(os.path.join(cpt, 'is2re_predictions.npz'))
+    chpt_to_lmdb_dict = {}
+    all_chpts = [np.load(os.path.join(chpt, 'is2re_predictions.npz')) \
+                 for chpt in glob.glob(os.path.join(checkpoints_dir, '*'))]
+    for lmdb in glob.glob(os.path.join(lmdb_dir, '*')):
+        if 'lock' in lmdb:
+            continue
+        traj = SinglePointLmdbDataset({"src": lmdb})
+        for chpt in all_chpts:
+            if len(chpt.get('ids')) == len(traj):
+                chpt_to_lmdb_dict[len(traj)] = {'traj': traj, 'chpt': chpt}
 
-        count = len(checkpoints.get('ids'))
-        single_traj = SinglePointLmdbDataset({"src": os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (count-1))})
+    ads_dict = {}
+    for count in chpt_to_lmdb_dict.keys():
+        checkpoints = chpt_to_lmdb_dict[count]['chpt']
+        single_traj = chpt_to_lmdb_dict[count]['traj']
+
         idx_list, eads_list = zip(*sorted(zip(checkpoints.get('ids'), checkpoints.get('energy'))))
 
         for i, eads in enumerate(eads_list):
