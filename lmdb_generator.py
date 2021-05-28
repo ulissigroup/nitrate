@@ -195,6 +195,6 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir):
                 ads_dict[n] = {}
             if hkl not in ads_dict[n].keys():
                 ads_dict[n][hkl] = {'N': [], 'O': []}
-            ads_dict[n][hkl][ads].append(all_eads_name[sid])
+            ads_dict[n][hkl][ads].append(eads)
 
     return ads_dict
