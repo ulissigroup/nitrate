@@ -2,7 +2,7 @@ from pymatgen import Composition, Structure
 from pymatgen.io.ase import AseAtomsAdaptor
 from ocpmodels.preprocessing import AtomsToGraphs
 from ocpmodels.datasets.trajectory_lmdb import TrajectoryLmdbDataset
-from single_point_lmdb import SinglePointLmdbDataset
+from ocpmodels.datasets.single_point_lmdb import SinglePointLmdbDataset
 import sys, os, glob
 sys.path.append(os.getcwd())
 from other_functions import str_to_hkl
