@@ -171,7 +171,7 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir):
         checkpoints = np.load(os.path.join(cpt, 'is2re_predictions.npz'))
 
         count = len(checkpoints.get('ids'))
-        single_traj = SinglePointLmdbDataset({"src": os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (count))})
+        single_traj = SinglePointLmdbDataset({"src": os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (count-1))})
         idx_list, eads_list = zip(*sorted(zip(checkpoints.get('ids'), checkpoints.get('energy'))))
 
         for i, eads in enumerate(eads_list):
@@ -186,5 +186,5 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir):
             if hkl not in ads_dict[n].keys():
                 ads_dict[n][hkl] = {'N': [], 'O': []}
             ads_dict[n][hkl][ads].append(all_eads_name[sid])
-    
+
     return ads_dict
