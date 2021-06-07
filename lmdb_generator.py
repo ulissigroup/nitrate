@@ -100,7 +100,7 @@ O = Molecule(['O'], [[0, 0, 0]])
 N = Molecule(['N'], [[0, 0, 0]])
 ads_dict = {"*O": O, "*N": N}
 
-def generate_multiple_lmdbs(entries_list, lmdb_dir):
+def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None):
 
     count = 0
     sid = 0
@@ -118,6 +118,7 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir):
             mmi = 1
 
         mmi = 1 if len(s) > 10 else mmi
+        mmi = set_mmi if set_mmi else mmi
         if len(s) > 24:
             all_slabs = []
             for hkl in get_symmetrically_distinct_miller_indices(s, mmi):
