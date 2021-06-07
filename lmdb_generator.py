@@ -163,6 +163,8 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None):
             all_adslabs = []
             count = 0
 
+    test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (count)))
+
 
 def get_eads_dicts(lmdb_dir, checkpoints_dir):
 
