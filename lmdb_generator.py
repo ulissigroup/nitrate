@@ -162,7 +162,8 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None):
             test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (count)))
             all_adslabs = []
             count = 0
-
+            
+    print('max slab size', max([len(slab) for slab in all_adslabs]))
     test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (count)))
 
 
