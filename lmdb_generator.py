@@ -8,9 +8,7 @@ sys.path.append(os.getcwd())
 from other_functions import str_to_hkl
 
 
-import lmdb
-import pickle
-import torch
+import lmdb, pickle, torch, string, random
 
 def read_trajectory_extract_features(a2g, adslabs_list):
     tags_dict = {"subsurface": 2, 'surface': 1, 'adsorbate': 0}
@@ -154,17 +152,21 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None):
                     count += 1
                     sid += 1
 
+                if count > 4000:
+                    rid = ''.join([random.choice(string.ascii_letters
+                                                 + string.digits) for n in range(10)])
+                    print('max slab size', max([len(slab) for slab in all_adslabs]))
+                    test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (rid)))
+                    all_adslabs = []
+                    count = 0
+
         tend = time.time()
         print(len(all_slabs), len(all_adslabs), tend - tstart, j)
 
-        if count > 4000:
-            print('max slab size', max([len(slab) for slab in all_adslabs]))
-            test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (count)))
-            all_adslabs = []
-            count = 0
-            
     print('max slab size', max([len(slab) for slab in all_adslabs]))
-    test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (count)))
+    rid = ''.join([random.choice(string.ascii_letters
+                                 + string.digits) for n in range(10)])
+    test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (rid)))
 
 
 def get_eads_dicts(lmdb_dir, checkpoints_dir):
