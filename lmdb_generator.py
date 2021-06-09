@@ -155,7 +155,7 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None):
                 if count > 4000:
                     rid = ''.join([random.choice(string.ascii_letters
                                                  + string.digits) for n in range(10)])
-                    print('max slab size', max([len(slab) for slab in all_adslabs]))
+                    print('max slab size', max([len(slab) for slab in all_adslabs]), '%s_no3rr_screen.lmdb' % (rid))
                     test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (rid)))
                     all_adslabs = []
                     count = 0
@@ -163,9 +163,9 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None):
         tend = time.time()
         print(len(all_slabs), len(all_adslabs), tend - tstart, j)
 
-    print('max slab size', max([len(slab) for slab in all_adslabs]))
     rid = ''.join([random.choice(string.ascii_letters
                                  + string.digits) for n in range(10)])
+    print('max slab size', max([len(slab) for slab in all_adslabs]), '%s_no3rr_screen.lmdb' % (rid))
     test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (rid)))
 
 
@@ -173,15 +173,14 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir):
 
     # load predicted adsorption energies
     chpt_to_lmdb_dict = {}
-    all_chpts = [np.load(os.path.join(chpt, 'is2re_predictions.npz')) \
-                 for chpt in glob.glob(os.path.join(checkpoints_dir, '*'))]
+    all_chpts = {chpt.split('/')[-1].split('-')[-1]: np.load(os.path.join(chpt, 'is2re_predictions.npz')) \
+                 for chpt in glob.glob(os.path.join(checkpoints_dir, '*'))}
     for lmdb in glob.glob(os.path.join(lmdb_dir, '*')):
         if 'lock' in lmdb:
             continue
+        name = lmdb.split('/')[-1].split('_')[0]
         traj = SinglePointLmdbDataset({"src": lmdb})
-        for chpt in all_chpts:
-            if len(chpt.get('ids')) == len(traj):
-                chpt_to_lmdb_dict[len(traj)] = {'traj': traj, 'chpt': chpt}
+        chpt_to_lmdb_dict[name] = {'traj': traj, 'chpt': chpt}
 
     ads_dict = {}
     for count in chpt_to_lmdb_dict.keys():
