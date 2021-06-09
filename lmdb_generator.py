@@ -180,7 +180,7 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir):
             continue
         name = lmdb.split('/')[-1].split('_')[0]
         traj = SinglePointLmdbDataset({"src": lmdb})
-        chpt_to_lmdb_dict[name] = {'traj': traj, 'chpt': chpt}
+        chpt_to_lmdb_dict[name] = {'traj': traj, 'chpt': all_chpts[name]}
 
     ads_dict = {}
     for count in chpt_to_lmdb_dict.keys():
