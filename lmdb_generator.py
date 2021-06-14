@@ -1,4 +1,4 @@
-from pymatgen import Composition, Structure
+from pymatgen import Composition, Structure, Lattice
 from pymatgen.io.ase import AseAtomsAdaptor
 from ocpmodels.preprocessing import AtomsToGraphs
 from ocpmodels.datasets.trajectory_lmdb import TrajectoryLmdbDataset
@@ -169,7 +169,7 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None):
     test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (rid)))
 
 
-def get_eads_dicts(lmdb_dir, checkpoints_dir):
+def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None, structure=False):
 
     # load predicted adsorption energies
     chpt_to_lmdb_dict = {}
@@ -192,6 +192,11 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir):
         for i, eads in enumerate(eads_list):
 
             dat = single_traj[i]
+            if name_tag and name_tag not in dat.name:
+                continue
+            if structure:
+                s = Structure(Lattice(dat.cell), dat.atomic_numbers,
+                              dat.pos, coords_are_cartesian=True)
             sid = dat.sid
             formula, hkl, ads, nads, r, nslab, entry_id = dat.name.split('_')
             hkl = str(str_to_hkl(hkl))
@@ -200,6 +205,9 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir):
                 ads_dict[n] = {}
             if hkl not in ads_dict[n].keys():
                 ads_dict[n][hkl] = {'N': [], 'O': []}
-            ads_dict[n][hkl][ads].append(eads)
+            if structure:
+                ads_dict[n][hkl][ads].append({"eads": eads, "structure": s.as_dict()})
+            else:
+                ads_dict[n][hkl][ads].append(eads)
 
     return ads_dict
