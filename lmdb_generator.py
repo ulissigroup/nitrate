@@ -182,7 +182,7 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None, structure=False):
         traj = SinglePointLmdbDataset({"src": lmdb})
         chpt_to_lmdb_dict[name] = {'traj': traj, 'chpt': all_chpts[name]}
 
-    ads_dict = {}
+    dat_dict = {}
     for count in chpt_to_lmdb_dict.keys():
         checkpoints = chpt_to_lmdb_dict[count]['chpt']
         single_traj = chpt_to_lmdb_dict[count]['traj']
@@ -190,24 +190,31 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None, structure=False):
         idx_list, eads_list = zip(*sorted(zip(checkpoints.get('ids'), checkpoints.get('energy'))))
 
         for i, eads in enumerate(eads_list):
-
             dat = single_traj[i]
             if name_tag and name_tag not in dat.name:
                 continue
-            if structure:
-                s = Structure(Lattice(dat.cell), dat.atomic_numbers,
-                              dat.pos, coords_are_cartesian=True)
-            sid = dat.sid
             formula, hkl, ads, nads, r, nslab, entry_id = dat.name.split('_')
             hkl = str(str_to_hkl(hkl))
             n = '%s_%s' % (formula, entry_id)
-            if n not in ads_dict.keys():
-                ads_dict[n] = {}
-            if hkl not in ads_dict[n].keys():
-                ads_dict[n][hkl] = {'N': [], 'O': []}
-            if structure:
-                ads_dict[n][hkl][ads].append({"eads": eads, "structure": s.as_dict()})
-            else:
-                ads_dict[n][hkl][ads].append(eads)
+            if n not in dat_dict.keys():
+                dat_dict[n] = {}
+            if hkl not in dat_dict[n].keys():
+                dat_dict[n][hkl] = {'N': [], 'O': []}
+            dat_dict[n][hkl][ads].append([dat, eads])
 
+    ads_dict = {}
+    for n in dat_dict.keys():
+        ads_dict[n] = {}
+        for hkl in dat_dict[n].keys():
+            ads_dict[n][hkl] = {}
+            for ads in dat_dict[n][hkl].keys():
+                ads_dict[n][hkl][ads] = []
+                for data in dat_dict[n][hkl][ads]:
+                    if structure:
+                        s = Structure(Lattice(data[0].cell), data[0].atomic_numbers,
+                                      data[0].pos, coords_are_cartesian=True)
+                        ads_dict[n][hkl][ads].append({'eads': data[1], 'structure': s})
+                    else:
+                        ads_dict[n][hkl][ads].append(data[1])
+                        
     return ads_dict
