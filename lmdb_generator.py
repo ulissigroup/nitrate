@@ -213,8 +213,8 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None, structure=False):
                     if structure:
                         s = Structure(Lattice(data[0].cell), data[0].atomic_numbers,
                                       data[0].pos, coords_are_cartesian=True)
-                        ads_dict[n][hkl][ads].append({'eads': data[1], 'structure': s})
+                        ads_dict[n][hkl][ads].append({'eads': data[1], 'structure': s.as_dict()})
                     else:
                         ads_dict[n][hkl][ads].append(data[1])
-                        
+
     return ads_dict
