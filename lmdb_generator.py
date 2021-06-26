@@ -133,7 +133,9 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None, prefix=None):
             if len(slab) > 300:
                 continue
             adslabgen = AdsorbateSiteFinder(slab)
-            adslabs = adslabgen.generate_adsorption_structures(ads_dict['*O'], min_lw=8)
+            adslabs = adslabgen.generate_adsorption_structures(ads_dict['*O'], min_lw=8,
+                                                               find_args={'symm_reduce': 5e-2,
+                                                                          'near_reduce': 5e-2})
             for ii, adslab in enumerate(adslabs):
 
                 setattr(adslab, 'suffix', '%s_slab_%s_%s' % (ii, i, entry.entry_id))
