@@ -68,6 +68,7 @@ def test_lmdb_builder(adslabs_list, lmdb_path):
             suffix = None
         name = fid_writer(adslabs_list[idx], suffix=suffix)
         dat.sid = adslabs_list[idx].sid
+        dat.idx = idx
         dat.name = name
         idx_to_sys_dict[idx] = [name, adslabs_list[idx].to_json()]
         # no neighbor edge case check
@@ -169,7 +170,7 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None):
     test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (rid)))
 
 
-def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None, structure=False):
+def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None):
 
     # load predicted adsorption energies
     chpt_to_lmdb_dict = {}
@@ -201,20 +202,6 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None, structure=False):
             if hkl not in dat_dict[n].keys():
                 dat_dict[n][hkl] = {'N': [], 'O': []}
             dat_dict[n][hkl][ads].append([dat, eads])
+            dat_dict[n][hkl][ads].append({'eads': eads, 'idx': i, 'lmdb': count})
 
-    ads_dict = {}
-    for n in dat_dict.keys():
-        ads_dict[n] = {}
-        for hkl in dat_dict[n].keys():
-            ads_dict[n][hkl] = {}
-            for ads in dat_dict[n][hkl].keys():
-                ads_dict[n][hkl][ads] = []
-                for data in dat_dict[n][hkl][ads]:
-                    if structure:
-                        s = Structure(Lattice(data[0].cell), data[0].atomic_numbers,
-                                      data[0].pos, coords_are_cartesian=True)
-                        ads_dict[n][hkl][ads].append({'eads': data[1], 'structure': s.as_dict()})
-                    else:
-                        ads_dict[n][hkl][ads].append(data[1])
-
-    return ads_dict
+    return dat_dict
