@@ -126,7 +126,8 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None, prefix=None):
         else:
             all_slabs = generate_all_slabs(s, mmi, 4, 8, lll_reduce=True, center_slab=True, in_unit_planes=True)
 
-        print(len(s), sg.get_crystal_system(), entry.composition.reduced_formula, mmi, len(all_slabs))
+        print(len(s), sg.get_crystal_system(), entry.composition.reduced_formula, mmi,
+              len(all_slabs), max([len(s) for s in all_slabs]))
 
         for i, slab in enumerate(all_slabs):
             if len(slab) > 300:
