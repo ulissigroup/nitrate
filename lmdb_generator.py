@@ -99,7 +99,7 @@ O = Molecule(['O'], [[0, 0, 0]])
 N = Molecule(['N'], [[0, 0, 0]])
 ads_dict = {"*O": O, "*N": N}
 
-def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None):
+def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None, prefix=None):
 
     count = 0
     sid = 0
@@ -166,8 +166,9 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None):
 
     rid = ''.join([random.choice(string.ascii_letters
                                  + string.digits) for n in range(10)])
-    print('max slab size', max([len(slab) for slab in all_adslabs]), '%s_no3rr_screen.lmdb' % (rid))
-    test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, '%s_no3rr_screen.lmdb' % (rid)))
+    lmdb_name = '%s_no3rr_screen.lmdb' % (rid) if not prefix else '%s_%s_no3rr_screen.lmdb' % (prefix, rid)
+    print('max slab size', max([len(slab) for slab in all_adslabs]), lmdb_name)
+    test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, lmdb_name))
 
 
 def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None):
