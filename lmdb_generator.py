@@ -98,7 +98,8 @@ O = Molecule(['O'], [[0, 0, 0]])
 N = Molecule(['N'], [[0, 0, 0]])
 ads_dict = {"*O": O, "*N": N}
 
-def generate_multiple_lmdbs(entries_list, lmdb_dir, max_slabs=2000, set_mmi=None, prefix=None):
+def generate_multiple_lmdbs(entries_list, lmdb_dir, max_slabs=2000, 
+                            set_mmi=None, prefix=None, hkl_list=[]):
 
     count = 0
     sid = 0
@@ -117,13 +118,22 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, max_slabs=2000, set_mmi=None
 
         mmi = 1 if len(s) > 10 else mmi
         mmi = set_mmi if set_mmi else mmi
-        if len(s) > 24:
+        if hkl_list:
             all_slabs = []
-            for hkl in get_symmetrically_distinct_miller_indices(s, mmi):
-                slabgen = SlabGenerator(s, hkl, 4, 8, lll_reduce=True, center_slab=True, in_unit_planes=True)
-                all_slabs.append(slabgen.get_slab())
+            for hkl in hkl_list:
+                slabgen = SlabGenerator(s, hkl, 4, 8, lll_reduce=True, center_slab=True,
+                                        in_unit_planes=True)
+                all_slabs.extend(slabgen.get_slabs())
         else:
-            all_slabs = generate_all_slabs(s, mmi, 4, 8, lll_reduce=True, center_slab=True, in_unit_planes=True)
+            if len(s) > 24:
+                all_slabs = []
+                for hkl in get_symmetrically_distinct_miller_indices(s, mmi):
+                    slabgen = SlabGenerator(s, hkl, 4, 8, lll_reduce=True, center_slab=True,
+                                            in_unit_planes=True)
+                    all_slabs.append(slabgen.get_slab())
+            else:
+                all_slabs = generate_all_slabs(s, mmi, 4, 8, lll_reduce=True, center_slab=True, 
+                                               in_unit_planes=True)
 
         print(len(s), sg.get_crystal_system(), entry.composition.reduced_formula, mmi,
               len(all_slabs), max([len(s) for s in all_slabs]))
