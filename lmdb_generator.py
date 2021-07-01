@@ -1,6 +1,7 @@
 from pymatgen import Composition, Structure, Lattice
 from pymatgen.io.ase import AseAtomsAdaptor
-from ocpmodels.preprocessing import AtomsToGraphs
+from ocpmodels.preprocessing import AtomsToGraphs 
+from ocpmodels.preprocessing.struct_to_graphs import StructToGraphs
 from ocpmodels.datasets.trajectory_lmdb import TrajectoryLmdbDataset
 from ocpmodels.datasets.single_point_lmdb import SinglePointLmdbDataset
 import sys, os, glob
@@ -12,13 +13,11 @@ import lmdb, pickle, torch, string, random
 
 def read_trajectory_extract_features(a2g, adslabs_list):
     tags_dict = {"subsurface": 2, 'surface': 1, 'adsorbate': 0}
-    adaptor = AseAtomsAdaptor()
-    list_of_atoms = [adaptor.get_atoms(adslab) for adslab in adslabs_list]
 
     # Converts a list of atoms object representing
     # slabs into Data objects with features inside
     tagged_data_objects = []
-    data_objects = a2g.convert_all(list_of_atoms, disable_tqdm=True)
+    data_objects = a2g.convert_all(adslabs_list, disable_tqdm=True)
     for i, dat in enumerate(data_objects):
         slab = adslabs_list[i]
         tags = [tags_dict[site.surface_properties] for site in slab]
@@ -47,8 +46,8 @@ def fid_writer(adslab, suffix=None):
 
 def test_lmdb_builder(adslabs_list, lmdb_path):
     # Write to LMDB
-    a2g = AtomsToGraphs(max_neigh=50, radius=6, r_energy=False,
-                        r_distances=False, r_fixed=True)
+    a2g = StructToGraphs(max_neigh=50, radius=6, r_energy=False,
+                         r_distances=False, r_fixed=True)
     db = lmdb.open(lmdb_path, map_size=1099511627776 * 2,
                    subdir=False, meminit=False, map_async=True)
 
@@ -99,7 +98,7 @@ O = Molecule(['O'], [[0, 0, 0]])
 N = Molecule(['N'], [[0, 0, 0]])
 ads_dict = {"*O": O, "*N": N}
 
-def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None, prefix=None):
+def generate_multiple_lmdbs(entries_list, lmdb_dir, max_slabs=2000, set_mmi=None, prefix=None):
 
     count = 0
     sid = 0
@@ -134,10 +133,10 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None, prefix=None):
                 continue
             adslabgen = AdsorbateSiteFinder(slab)
             adslabs = adslabgen.generate_adsorption_structures(ads_dict['*O'], min_lw=8,
-                                                               find_args={'symm_reduce': 5e-2,
-                                                                          'near_reduce': 5e-2})
+                                                               find_args={'symm_reduce': 1e-1,
+                                                                          'near_reduce': 1e-1})
+                                                            
             for ii, adslab in enumerate(adslabs):
-
                 setattr(adslab, 'suffix', '%s_slab_%s_%s' % (ii, i, entry.entry_id))
                 setattr(adslab, 'sid', sid)
                 if len(adslab) < 800:
@@ -156,7 +155,7 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, set_mmi=None, prefix=None):
                     count += 1
                     sid += 1
 
-                if count > 4000:
+                if count > max_slabs:
                     rid = ''.join([random.choice(string.ascii_letters
                                                  + string.digits) for n in range(10)])
                     lmdb_name = '%s_no3rr_screen.lmdb' % (rid) if not prefix else '%s_%s_no3rr_screen.lmdb' % (prefix, rid)
