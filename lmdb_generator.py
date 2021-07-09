@@ -13,11 +13,12 @@ import lmdb, pickle, torch, string, random
 
 def read_trajectory_extract_features(a2g, adslabs_list):
     tags_dict = {"subsurface": 2, 'surface': 1, 'adsorbate': 0}
-
+    adaptor = AseAtomsAdaptor()
+    list_of_atoms = [adaptor.get_atoms(adslab) for adslab in adslabs_list]
     # Converts a list of atoms object representing
     # slabs into Data objects with features inside
     tagged_data_objects = []
-    data_objects = a2g.convert_all(adslabs_list, disable_tqdm=True)
+    data_objects = a2g.convert_all(list_of_atoms, disable_tqdm=True)
     for i, dat in enumerate(data_objects):
         slab = adslabs_list[i]
         tags = [tags_dict[site.surface_properties] for site in slab]
@@ -46,7 +47,7 @@ def fid_writer(adslab, suffix=None):
 
 def test_lmdb_builder(adslabs_list, lmdb_path):
     # Write to LMDB
-    a2g = StructToGraphs(max_neigh=50, radius=6, r_energy=False,
+    a2g = AtomsToGraphs(max_neigh=50, radius=6, r_energy=False,
                          r_distances=False, r_fixed=True)
     db = lmdb.open(lmdb_path, map_size=1099511627776 * 2,
                    subdir=False, meminit=False, map_async=True)
@@ -99,7 +100,7 @@ N = Molecule(['N'], [[0, 0, 0]])
 ads_dict = {"*O": O, "*N": N}
 
 def generate_multiple_lmdbs(entries_list, lmdb_dir, max_slabs=2000, 
-                            set_mmi=None, prefix=None, hkl_list=[]):
+                            set_mmi=None, prefix=None, hkl_list=[], find_args=None):
 
     count = 0
     sid = 0
@@ -142,9 +143,9 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, max_slabs=2000,
             if len(slab) > 300:
                 continue
             adslabgen = AdsorbateSiteFinder(slab)
-            adslabs = adslabgen.generate_adsorption_structures(ads_dict['*O'], min_lw=8,
-                                                               find_args={'symm_reduce': 1e-1,
-                                                                          'near_reduce': 1e-1})
+            
+            adslabs = adslabgen.generate_adsorption_structures(ads_dict['*O'], min_lw=8, 
+                                                               find_args=find_args)
                                                             
             for ii, adslab in enumerate(adslabs):
                 setattr(adslab, 'suffix', '%s_slab_%s_%s' % (ii, i, entry.entry_id))
@@ -202,12 +203,12 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None):
         checkpoints = chpt_to_lmdb_dict[count]['chpt']
         single_traj = chpt_to_lmdb_dict[count]['traj']
 
-        idx_list, eads_list = zip(*sorted(zip(checkpoints.get('ids'), checkpoints.get('energy'))))
+        idx_list, eads_list = checkpoints.get('ids'), checkpoints.get('energy')
 
-        for i, eads in enumerate(eads_list):
-            dat = single_traj[i]
+        for i, dat in enumerate(single_traj):
             if name_tag and name_tag not in dat.name:
                 continue
+
             formula, hkl, ads, nads, r, nslab, entry_id = dat.name.split('_')
             hkl = str(str_to_hkl(hkl))
             n = '%s_%s' % (formula, entry_id)
@@ -215,7 +216,8 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None):
                 dat_dict[n] = {}
             if hkl not in dat_dict[n].keys():
                 dat_dict[n][hkl] = {'N': [], 'O': []}
-            dat_dict[n][hkl][ads].append([dat, eads])
+
+            eads = eads_list[idx_list.index(str(i))]
             dat_dict[n][hkl][ads].append({'eads': eads, 'idx': i, 'lmdb': count})
 
     return dat_dict
