@@ -54,7 +54,6 @@ def test_lmdb_builder(adslabs_list, lmdb_path):
 
     data_objects = read_trajectory_extract_features(a2g, adslabs_list)
 
-    idx_to_sys_dict = {}
     for idx, dat in enumerate(data_objects):
 
         # add additional attributes
@@ -70,7 +69,6 @@ def test_lmdb_builder(adslabs_list, lmdb_path):
         dat.sid = adslabs_list[idx].sid
         dat.idx = idx
         dat.name = name
-        idx_to_sys_dict[idx] = [name, adslabs_list[idx].to_json()]
         # no neighbor edge case check
         if dat.edge_index.shape[1] == 0:
             print("no neighbors")
@@ -83,24 +81,23 @@ def test_lmdb_builder(adslabs_list, lmdb_path):
         db.sync()
 
     db.close()
-    return idx_to_sys_dict
 
 
 from pymatgen import Molecule
 from pymatgen.analysis.adsorption import AdsorbateSiteFinder
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 import time
+from pymatgen.core.surface import *
 
 sys.path.append(os.getcwd())
-sys.path.append('/home/jovyan/repos/mo-wulff-workflow/')
-from surface import *
 
 O = Molecule(['O'], [[0, 0, 0]])
 N = Molecule(['N'], [[0, 0, 0]])
 ads_dict = {"*O": O, "*N": N}
 
-def generate_multiple_lmdbs(entries_list, lmdb_dir, max_slabs=2000, 
-                            set_mmi=None, prefix=None, hkl_list=[], find_args=None):
+def generate_multiple_lmdbs(entries_list, lmdb_dir, min_slab_size=4, min_vacuum_size=8,
+                            in_unit_planes=True, max_slabs=10000, mmi=2, 
+                            max_i_only=False, prefix=None, hkl_list=[], find_args=None):
 
     count = 0
     sid = 0
@@ -112,13 +109,13 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, max_slabs=2000,
         s = entry.structure
         sg = SpacegroupAnalyzer(s)
         s = sg.get_conventional_standard_structure()
-        if sg.get_crystal_system() in ['hexagonal', 'cubic']:
-            mmi = 2
-        else:
-            mmi = 1
+#         if sg.get_crystal_system() in ['hexagonal', 'cubic']:
+#             mmi = 2
+#         else:
+#             mmi = 1
 
-        mmi = 1 if len(s) > 10 else mmi
-        mmi = set_mmi if set_mmi else mmi
+#         mmi = 1 if len(s) > 10 else mmi
+#         mmi = set_mmi if set_mmi else mmi
         if hkl_list:
             all_slabs = []
             for hkl in hkl_list:
@@ -126,15 +123,18 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, max_slabs=2000,
                                         in_unit_planes=True)
                 all_slabs.extend(slabgen.get_slabs())
         else:
-            if len(s) > 24:
-                all_slabs = []
-                for hkl in get_symmetrically_distinct_miller_indices(s, mmi):
-                    slabgen = SlabGenerator(s, hkl, 4, 8, lll_reduce=True, center_slab=True,
-                                            in_unit_planes=True)
-                    all_slabs.append(slabgen.get_slab())
-            else:
-                all_slabs = generate_all_slabs(s, mmi, 4, 8, lll_reduce=True, center_slab=True, 
-                                               in_unit_planes=True)
+#             if len(s) > 24:
+            all_slabs = []
+            for hkl in get_symmetrically_distinct_miller_indices(s, mmi):
+                if max(hkl) != mmi and max_i_only:
+                    continue
+                slabgen = SlabGenerator(s, hkl, min_slab_size, min_vacuum_size=4, 
+                                        lll_reduce=True, center_slab=True,
+                                        in_unit_planes=in_unit_planes)
+                all_slabs.append(slabgen.get_slab())
+    #             else:
+    #                 all_slabs = generate_all_slabs(s, mmi, 4, 8, lll_reduce=True, center_slab=True, 
+    #                                                in_unit_planes=True)
 
         print(len(s), sg.get_crystal_system(), entry.composition.reduced_formula, mmi,
               len(all_slabs), max([len(s) for s in all_slabs]))
@@ -150,7 +150,7 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, max_slabs=2000,
             for ii, adslab in enumerate(adslabs):
                 setattr(adslab, 'suffix', '%s_slab_%s_%s' % (ii, i, entry.entry_id))
                 setattr(adslab, 'sid', sid)
-                if len(adslab) < 800:
+                if len(adslab) < 300:
                     all_adslabs.append(adslab)
                     count += 1
                     sid += 1
@@ -161,7 +161,7 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, max_slabs=2000,
                 setattr(adslab2, 'sid', sid)
                 adslab2.add_site_property('surface_properties',
                                           adslab.site_properties['surface_properties'])
-                if len(adslab) < 800:
+                if len(adslab) < 300:
                     all_adslabs.append(adslab2)
                     count += 1
                     sid += 1
@@ -183,6 +183,82 @@ def generate_multiple_lmdbs(entries_list, lmdb_dir, max_slabs=2000,
     lmdb_name = '%s_no3rr_screen.lmdb' % (rid) if not prefix else '%s_%s_no3rr_screen.lmdb' % (prefix, rid)
     print('max slab size', max([len(slab) for slab in all_adslabs]), lmdb_name)
     test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, lmdb_name))
+    
+    
+def generate_multiple_lmdbs_random(entries_list, lmdb_dir, min_slab_size=4, min_vacuum_size=8,
+                                   in_unit_planes=True, max_slabs=5000, prefix=None):
+
+    count = 0
+    sid = 0
+    all_adslabs = []
+
+    for j, entry in enumerate(entries_list):
+
+        tstart = time.time()
+        s = entry.structure
+        sg = SpacegroupAnalyzer(s)
+        s = sg.get_conventional_standard_structure()
+        if len(s) > 100:
+            continue
+        hkl_list = random.sample([hkl for hkl in get_symmetrically_distinct_miller_indices(s, 3) if max(hkl) in [2, 3]], 5)
+        all_slabs = []
+        for hkl in hkl_list:
+            slabgen = SlabGenerator(s, hkl, 4, 8, lll_reduce=True, 
+                                    center_slab=True, in_unit_planes=True)
+            all_slabs.append(slabgen.get_slab())
+
+        print(len(s), sg.get_crystal_system(), entry.composition.reduced_formula,
+              len(all_slabs), max([len(s) for s in all_slabs]))
+
+        for i, slab in enumerate(all_slabs):
+            if len(slab) > 300:
+                continue
+            adslabgen = AdsorbateSiteFinder(slab)
+            
+            adslabs = adslabgen.generate_adsorption_structures(ads_dict['*O'], min_lw=8, 
+                                                               find_args={'symm_reduce': 1e-1, 
+                                                                          'near_reduce': 1e-1})
+                                                            
+            for ii, adslab in enumerate(adslabs):
+                setattr(adslab, 'suffix', '%s_slab_%s_%s' % (ii, i, entry.entry_id))
+                setattr(adslab, 'sid', sid)
+                if len(adslab) < 300:
+                    all_adslabs.append(adslab)
+                    count += 1
+                    sid += 1
+
+                adslab2 = adslab.copy()
+                adslab2.replace(-1, 'N')
+                setattr(adslab2, 'suffix', '%s_slab_%s_%s' % (ii, i, entry.entry_id))
+                setattr(adslab2, 'sid', sid)
+                adslab2.add_site_property('surface_properties',
+                                          adslab.site_properties['surface_properties'])
+                if len(adslab) < 300:
+                    all_adslabs.append(adslab2)
+                    count += 1
+                    sid += 1
+
+                if count > max_slabs:
+                    rid = ''.join([random.choice(string.ascii_letters
+                                                 + string.digits) for n in range(10)])
+                    lmdb_name = '%s_no3rr_screen.lmdb' % (rid) if not prefix else '%s_%s_no3rr_screen.lmdb' % (prefix, rid)
+                    print('max slab size', max([len(slab) for slab in all_adslabs]), lmdb_name)
+                    test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, lmdb_name))
+                    all_adslabs = []
+                    os.system('gzip %s' %(os.path.join(lmdb_dir, lmdb_name)))
+                    count = 0
+
+        tend = time.time()
+        print(len(all_slabs), len(all_adslabs), tend - tstart, j)
+    
+    if len(all_adslabs) != 0:
+        rid = ''.join([random.choice(string.ascii_letters
+                                     + string.digits) for n in range(10)])
+        lmdb_name = '%s_no3rr_screen.lmdb' % (rid) if not prefix else '%s_%s_no3rr_screen.lmdb' % (prefix, rid)
+        print('max slab size', max([len(slab) for slab in all_adslabs]), lmdb_name)
+        test_lmdb_builder(all_adslabs, os.path.join(lmdb_dir, lmdb_name))
+        os.system('gzip %s' %(os.path.join(lmdb_dir, lmdb_name)))
+
 
 
 def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None):
@@ -194,8 +270,9 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None):
     for lmdb in glob.glob(os.path.join(lmdb_dir, '*')):
         if 'lock' in lmdb:
             continue
-        name = lmdb.split('/')[-1].split('_')[0]
+        name = lmdb.split('/')[-1].replace('_no3rr_screen.lmdb', '')
         traj = SinglePointLmdbDataset({"src": lmdb})
+        
         chpt_to_lmdb_dict[name] = {'traj': traj, 'chpt': all_chpts[name]}
 
     dat_dict = {}
@@ -208,8 +285,21 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None):
         for i, dat in enumerate(single_traj):
             if name_tag and name_tag not in dat.name:
                 continue
-
-            formula, hkl, ads, nads, r, nslab, entry_id = dat.name.split('_')
+            print(dat.name)
+            namelist = dat.name.split('_')
+            formula = namelist[0]
+            hkl = namelist[1]
+            ads = namelist[2]
+            nads = namelist[3]
+            r = namelist[4]
+            nslabs = namelist[5]
+            entry_id = ''
+            for ii, k in enumerate(namelist):
+                if ii > 5:
+                    if ii < len(namelist)-2:
+                        entry_id += k+'-'
+                    else:
+                        entry_id += k
             hkl = str(str_to_hkl(hkl))
             n = '%s_%s' % (formula, entry_id)
             if n not in dat_dict.keys():
@@ -217,7 +307,42 @@ def get_eads_dicts(lmdb_dir, checkpoints_dir, name_tag=None):
             if hkl not in dat_dict[n].keys():
                 dat_dict[n][hkl] = {'N': [], 'O': []}
 
-            eads = eads_list[idx_list.index(str(i))]
+            eads = eads_list[list(idx_list).index(str(i))]
             dat_dict[n][hkl][ads].append({'eads': eads, 'idx': i, 'lmdb': count})
 
     return dat_dict
+
+def get_eads_dicts_single(lmdb_dir, checkpoint_dir, name_tag=None):
+    
+    checkpoints = np.load(os.path.join(checkpoint_dir, 'is2re_predictions.npz'))
+    single_traj = SinglePointLmdbDataset({"src": lmdb_dir})
+    checkpoints = dict(zip(checkpoints.get('ids'), checkpoints.get('energy')))
+    
+    dat_dict = {}
+    for i, dat in enumerate(single_traj):
+        formula, hkl, ads, nads, r, nslabs, entry_id = dat.name.split('_')
+        
+        n = '%s_%s' % (formula, entry_id)
+        if n not in dat_dict.keys():
+            dat_dict[n] = {}
+        if hkl not in dat_dict[n].keys():
+            dat_dict[n][hkl] = {'N': [], 'O': []}
+
+        sid = str(dat.sid)
+        dat_dict[n][hkl][ads].append({'eads': checkpoints[sid], 'sid': sid})
+
+    return dat_dict
+
+def dat2struct(dat):
+    return Structure(Lattice(dat.cell), dat.atomic_numbers, dat.pos)
+def dat2dict(dat):
+    s = dat2struct(dat).as_dict()
+    name = dat.name
+    sid = dat.sid
+    idx = dat.idx
+    return {'structure': s, 'name': name, 'sid': sid, 'idx': idx}
+def traj2dict(traj):
+    traj2list = []
+    for dat in traj:
+        traj2list.append(dat2dict(dat))
+    return traj2list

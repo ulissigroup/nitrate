@@ -467,7 +467,35 @@ def extrapolate_tof(Eads_N, Eads_O, data):
         dists.append(np.linalg.norm(v1-v2))
     return data[dists.index(min(dists))]['ratelog']
 
+def get_distance_TOF(x, y):
+
+    # set up equation representing line of high activity
+    pt1 = [-5.3, -5.75]
+    pt2 = [-4.85, -4.65]
+    a = diff[1]/diff[0]
+    b = -1
+    c = pt2[1] - pt2[0]*a
+
+    if y > pt2[1]:
+        d = np.linalg.norm(np.array(pt2)-np.array([x,y]))
+
+    elif y < pt1[1]:
+        d = np.linalg.norm(np.array(pt1)-np.array([x,y]))
+    else:
+        a1 = -1/a 
+        c1 = y - a1*x
+        xl = (-1*c - -1*c1)/(-1*a1 - -1*a)
+        yl = (c1*a - c*a1)/(-1*a1 - -1*a)
+        vdiff = np.array([x,y]) - np.array(xl, yl)
+        d = np.linalg.norm(vdiff)
+    
+    return d
 
 # Load condensed plot data
-with open("NO3_heatmap_files/all-condensed-plot-data-h2o-corrected_24-jul-2020.pckl", "rb") as f:
+import sys
+cwd = os.getcwd()
+sys.path.append(cwd.replace(cwd.split('/')[-1], ''))
+
+
+with open("/home/joyvan/repos/nitrate/NO3_heatmap_files/all-condensed-plot-data-h2o-corrected_24-jul-2020.pckl", "rb") as f:
     condensed_plot_data = pickle.load(f)
