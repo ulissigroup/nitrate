@@ -16,9 +16,9 @@ from scipy.optimize import curve_fit
 import statsmodels.api as sm
 import numpy as np
 import matplotlib.pyplot as plt
-from pymatgen import Structure
+from pymatgen.core.structure import *
 import pandas as pd
-from pymatgen import Element, Composition
+from pymatgen.core.periodic_table import Element
 from matplotlib import colors
 from matplotlib import cm
 
@@ -478,10 +478,48 @@ def get_distance_TOF(x, y, a,b,c,pt1,pt2):
         c1 = y - a1*x
         xl = (-1*c - -1*c1)/(-1*a1 - -1*a)
         yl = (c1*a - c*a1)/(-1*a1 - -1*a)
-        vdiff = np.array([x,y]) - np.array(xl, yl)
+        vdiff = np.array([x,y]) - np.array([xl, yl])
         d = np.linalg.norm(vdiff)
     
     return d
+
+# Selectivity
+from scipy.spatial import ConvexHull
+from scipy.spatial import Delaunay
+
+def select_N2(p):
+
+    N2_pos = [[-6.649522876274468, -6.610989010989012],
+              [-6.654777070063695, -6.511355311355311],
+              [-5.8521453069223766, -4.964102564102564],
+              [-5.4954480763397955, -4.96996336996337],
+              [-4.155190032897039, -5.052014652014652],
+              [-4.03781526329297, -5.163369963369964],
+              [-4.001381209024521, -5.643956043956044],
+              [-3.7510184083432487, -6.071794871794872],
+              [-3.8578661253820488, -6.171428571428572],
+              [-4.468883133851286, -6.452747252747253]]
+
+    hull = Delaunay(np.array(N2_pos))
+    return hull.find_simplex(p)>=0
+
+
+def select_NH3(p):
+
+    NH3_pos = [[-5.811320754716982, -5.861168384879726],
+               [-6.042767295597485, -5.586254295532646],
+               [-5.101886792452831, -4.393127147766323],
+               [-4.875471698113207, -4.189690721649485],
+               [-4.553459119496855, -4.55257731958763],
+               [-4.548427672955976, -4.838487972508592],
+               [-4.759748427672957, -5.536769759450172],
+               [-5.076729559748427, -5.828178694158076]]
+
+    hull = Delaunay(np.array(NH3_pos))
+    return hull.find_simplex(p)>=0
+
+
+
 
 # Load condensed plot data
 import sys
