@@ -3,7 +3,7 @@ from pymatgen.db import QueryEngine
 import json, random, string, os, glob
 import numpy as np
 
-from pymatgen.core.structure import Structure, Molecule
+from pymatgen.core.structure import Structure, Molecule, Composition
 from pymatgen.core.surface import Slab
 from pymatgen.analysis.surface_analysis import *
 
@@ -20,6 +20,11 @@ def write_metadata_json(structure, calc_type, fname=None, name_of_adsorbate=None
     metadata = {}
     d = str(structure.as_dict())
     
+    bulk = structure if calc_type == 'bulk' else structure.oriented_unit_cell
+    bulk_formula = bulk.composition.reduced_formula
+    bulk_composition = bulk.composition.as_dict()
+    bulk_chemsys = bulk.composition.chemical_system
+
     if calc_type == 'adsorbate_in_a_box':
         name_of_adsorbate = structure.composition.to_pretty_string() \
         if not name_of_adsorbate else name_of_adsorbate 
@@ -35,6 +40,7 @@ def write_metadata_json(structure, calc_type, fname=None, name_of_adsorbate=None
          metadata = {'entry_id': entry_id, 'database': database, 
                      'bulk_rid': bulk_rid, 'rid': 'slab-%s' %(rid), 
                      'miller_index': list(structure.miller_index), 
+                     'bulk_formula': bulk_formula, 'bulk_composition': bulk_composition, 'bulk_chemsys': bulk_chemsys, 
                      'init_pmg_slab': d, 'calc_type': calc_type, 'func': functional}
 
     if calc_type == 'adsorbed_slab':
@@ -43,7 +49,7 @@ def write_metadata_json(structure, calc_type, fname=None, name_of_adsorbate=None
                     'bulk_rid': bulk_rid, 'slab_rid': slab_rid, 
                     'ads_rid': ads_rid, 'rid': 'adslab-%s' %(rid), 
                     'miller_index': list(structure.miller_index), 
-                    'bulk_formula': structure.oriented_unit_cell.composition.reduced_formula,
+                    'bulk_formula': bulk_formula, 'bulk_composition': bulk_composition, 'bulk_chemsys': bulk_chemsys, 
                     'init_pmg_slab': d, 'calc_type': calc_type, 'func': functional}
 
     if additional_data:
@@ -56,7 +62,6 @@ def write_metadata_json(structure, calc_type, fname=None, name_of_adsorbate=None
         return metadata
 
 
-    
 class SurfaceQueryEngine(QueryEngine):
 
     """
@@ -99,6 +104,7 @@ class SurfaceQueryEngine(QueryEngine):
         surface_properties = db[dbconfig['collection']]
 
         self.surface_properties = surface_properties
+        self.adsorbates_dict = self.get_all_adsorbate_entries_dict()
 
         super(SurfaceQueryEngine, self).__init__(**dbconfig)
         
@@ -116,8 +122,11 @@ class SurfaceQueryEngine(QueryEngine):
         criteria['calc_type'] = 'adsorbed_slab'
         
         adslab_entries = [entry for entry in self.surface_properties.find(criteria)]
+        adslab_w_Eads = []
         for entry in adslab_entries:
             bare_slab_entry = self.surface_properties.find_one({'rid': entry['slab_rid']})
+            if not bare_slab_entry:
+                continue
             bare_slab = Structure.from_dict(bare_slab_entry['calcs_reversed'][0]['output']['structure'])
             A = self.get_surface_area(bare_slab)
             adslab = Structure.from_dict(entry['calcs_reversed'][0]['output']['structure'])
@@ -133,17 +142,95 @@ class SurfaceQueryEngine(QueryEngine):
                 else ads_entry['calcs_reversed'][0]['output']['energy']
 
             entry['adsorption_energy'] = E_adslab - n*E_slab - E_adsorbate
-        
-        return adslab_entries
+            adslab_w_Eads.append(entry)
+        return adslab_w_Eads
     
-    def get_slab_entries_OC22(self, criteria, E_adsorbate=None, ads_rid=None, include_trajectories=False):
+    def get_OC22_docs_with_Eads(self, criteria, E_adsorbate=None,
+                                ads_rid=None, include_trajectories=False, 
+                                normalize=False):
         
+        ads_entries = self.adsorbates_dict
+        
+        if 'calc_type' not in criteria:
+            criteria['calc_type'] = 'adsorbed_slab'
+        criteria['calc_type'] = 'adsorbed_slab'
+        
+        # get all adsorbed slab entries
+        entries = [entry for entry in self.surface_properties.find(criteria)]
+        
+        # now pre-load all bare slab entries
+        slab_rids = []
+        for entry in entries:
+            if entry['slab_rid'] not in slab_rids:
+                slab_rids.append(entry['slab_rid'])
+        slab_rids_to_entry_dict = {}
+        for rid in slab_rids:
+            bare = self.surface_properties.find_one({'rid': rid})
+            if bare:
+                slab_rids_to_entry_dict[rid] = bare
+        
+        # now get the adsorption energies
+        new_entries = []
+        for adslab_entry in entries:
+            if adslab_entry['slab_rid'] not in slab_rids_to_entry_dict.keys():
+                continue
+            bare_slab_entry = slab_rids_to_entry_dict[adslab_entry['slab_rid']]
+            n = self.get_unit_primitive_area(adslab_entry, bare_slab_entry)
+            
+            ads = 'O' if 'couple' in adslab_entry['adsorbate'] else adslab_entry['adsorbate']
+            Nads = self.Nads_in_slab(Composition(adslab_entry['vasprun']['unit_cell_formula']), 
+                                     Composition(bare_slab_entry['vasprun']['unit_cell_formula']), 
+                                     Composition(ads))
+            Eadslab = adslab_entry['vasprun']['output']['final_energy']
+            Eslab = bare_slab_entry['vasprun']['output']['final_energy']
+            Eads = ads_entries[adslab_entry['ads_rid']]['energy']
+            BE = (Eadslab - n * Eslab) / Nads - Eads
+            BE = BE * Nads if not normalize else BE
+            adslab_entry['adsorption_energy'] = BE
+            adslab_entry['Nads'] = Nads
+            new_entries.append(adslab_entry)
+            
+        return new_entries
+            
+    def Nads_in_slab(self, asdlab_comp, bare_slab_comp, ads_comp):
+        """
+        Returns the TOTAL number of adsorbates in the slab on BOTH sides. Does 
+            so by comparing the composition of the adsorbed and clean slab and 
+            determining the number of adsorbates needed to make the resulting difference
+        """
+        rxn = Reaction([bare_slab_comp, ads_comp], [asdlab_comp])
+        return abs(rxn.coeffs[1])
+
+    def surface_area(self, slab):
+        """
+        Calculates the surface area of the slab
+        """
+        m = slab.lattice.matrix
+        return np.linalg.norm(np.cross(m[0], m[1]))
+            
+    def get_unit_primitive_area(self, adslab_entry, bare_slab_entry):
+        """
+        Returns the surface area of the adsorbed system per
+        unit area of the primitive slab system.
+        """
+        
+        A_ads = self.surface_area(Structure.from_dict(adslab_entry['vasprun']['output']['crystal']))
+        A_clean = self.surface_area(Structure.from_dict(bare_slab_entry['vasprun']['output']['crystal']))
+        n = A_ads / A_clean
+        return n
+    
+    def get_all_adsorbate_entries_dict(self):
         # get the adsorbate reference entries
-        ads_entries = {ads_entry['adsorbate']: \
-                       ComputedStructureEntry(Molecule.from_dict(json.loads(ads_entry['init_pmg_structure'].replace("'", "\""))),
-                                              ads_entry['energy']) 
-                       for ads_entry in self.surface_properties.find({"calc_type": 'adsorbate_in_a_box'})}
+        ads_entries = {ads_entry['rid']: ads_entry
+                       for ads_entry in self.surface_properties.find({"calc_type": 'adsorbate_in_a_box',
+                                                                      'func': 'OC20'})}
         
+        return ads_entries
+                
+    def get_slab_entries_OC22(self, criteria, E_adsorbate=None,
+                              ads_rid=None, include_trajectories=False):
+        
+        ads_entries = self.adsorbates_dict
         entries = [entry for entry in self.surface_properties.find(criteria)]
         
         # store clean slabs in a dict for easy reference in building adsorbed slab entry
@@ -165,15 +252,16 @@ class SurfaceQueryEngine(QueryEngine):
                     clean_entry = self.surface_properties.find_one({'rid': entry['slab_rid']})
                     if not clean_entry:
                         continue
-                    clean_entry[entry['slab_rid']] = SlabEntry(Structure.from_dict(clean_entry['vasprun']['output']['crystal']), 
+                    clean_dict[entry['slab_rid']] = SlabEntry(Structure.from_dict(clean_entry['vasprun']['output']['crystal']), 
                                                                clean_entry['vasprun']['output']['final_energy'], 
                                                                clean_entry['miller_index'], entry_id=clean_entry['entry_id'],
-                                                               data={k: clean_entry[k] for k in clean_entry.keys() if k != 'vasprun'})
+                                                               data={k: clean_entry[k] 
+                                                                     for k in clean_entry.keys() if k != 'vasprun'})
 
                 adslab_entry = SlabEntry(s, e, entry['miller_index'], entry_id=entry['entry_id'], 
-                                         adsorbates=[ads_entries[entry['adsorbate']]], 
+                                         adsorbates=[ads_entries[entry['ads_rid']]], 
                                          data={k: entry[k] for k in entry.keys() if k != 'vasprun'}, 
-                                         clean_entry=clean_entry[entry['slab_rid']])
+                                         clean_entry=clean_dict[entry['slab_rid']])
                 
                 if include_trajectories:
                     trajectories = []
@@ -182,8 +270,8 @@ class SurfaceQueryEngine(QueryEngine):
                         setattr(s, 'adsorption_energy', (adslab_entry.gibbs_binding_energy(eads=True) \
                                 - adslab_entry.energy + traj['e_wo_entrp'])/adslab_entry.Nads_in_slab)
                         trajectories.append(s)
-                
-                adslab_entry.data['trajectory_entries'] = trajectories
+                    adslab_entry.data['trajectory_entries'] = trajectories
+                    
                 slab_entries.append(adslab_entry)
             
         return slab_entries
@@ -208,3 +296,22 @@ def json_compatible_dict(dictionary):
                 dictionary[str(key)] = dictionary[key]
                 del dictionary[key]
     return dictionary
+
+def json_compatible_string(s):
+    s = s.replace("'", '"')
+    s = s.replace("None", '0')
+    s = s.replace("array", '')
+    s = s.replace("(", '')
+    s = s.replace(")", '')
+    s = s.replace("        ", ' ')
+    s = s.replace("       ", ' ')
+    s = s.replace("      ", ' ')
+    s = s.replace("     ", ' ')
+    s = s.replace("    ", ' ')
+    s = s.replace("   ", ' ')
+    s = s.replace("  ", ' ')
+    s = s.replace(" ", ' ')
+    s = s.replace("[ ", '[')
+    s = s.replace(" ]", ']')
+    
+    return s
