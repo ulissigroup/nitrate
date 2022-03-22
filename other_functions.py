@@ -1,6 +1,15 @@
 from pymatgen.analysis.pourbaix_diagram import PourbaixDiagram, PourbaixPlotter
-from pymatgen import MPRester
-from pymatgen import Composition, Structure, Lattice
+from pymatgen.cli.pmg_query import MPRester
+from pymatgen.core.structure import Composition, Structure, Lattice
+from urllib.error import HTTPError
+from pymatgen.io.ase import AseAtomsAdaptor
+
+adaptor = AseAtomsAdaptor()
+def aflow2pmg_entry(aflow_entry):
+    auid = aflow_entry.attributes['auid']
+    s = adaptor.get_structure(aflow_entry.atoms())
+    e = len(s) * aflow_entry.attributes['energy_atom']
+    return ComputedStructureEntry(s, e, entry_id=auid)
 
 
 def pourbaix_stable(all_entries, mprester=None):
