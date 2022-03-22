@@ -10,13 +10,9 @@ import numpy as np
 import sys, glob
 from matplotlib import pylab as plt
 import statsmodels.api as sm 
-sys.path.append('/home/jovyan/repos/nitrate/')
-sys.path.append('/home/jovyan/repos/ocp/ocpmodels/datasets/')
-sys.path.append('/home/jovyan/repos/mo-wulff-workflow/')
+sys.path.append('../')
 from samuel_TOF import make_tof_plot, extrapolate_tof, get_distance_TOF, select_N2, select_NH3
-# from lmdb_generator import *
 from other_functions import str_to_hkl
-# from ocpmodels.datasets.single_point_lmdb import SinglePointLmdbDataset
 from matplotlib.patches import Ellipse
 import matplotlib.pyplot as plt
 from matplotlib import cm
