@@ -1,41 +1,12 @@
-import os, json, glob, random, shutil, pickle, copy
-from pymatgen.entries.computed_entries import ComputedStructureEntry
+import json, glob, copy, sys
 from pymatgen.core.structure import *
-from pymatgen.cli.pmg_query import MPRester
-from pymatgen.core.surface import SlabGenerator, generate_all_slabs, StructureMatcher
-mprester = MPRester('mlcC4gtXFVqN9WLv')
-from pymatgen.analysis.adsorption import AdsorbateSiteFinder
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-import numpy as np
-import sys, glob
 from matplotlib import pylab as plt
-import statsmodels.api as sm 
 sys.path.append('../')
-from samuel_TOF import make_tof_plot, extrapolate_tof, get_distance_TOF, select_N2, select_NH3
-from other_functions import str_to_hkl
-from matplotlib.patches import Ellipse
-import matplotlib.pyplot as plt
 from matplotlib import cm
 import numpy as np
-from matplotlib import ticker
 from matplotlib.ticker import FixedLocator, FormatStrFormatter
 from matplotlib import patches
-Eads_ref_oc20 = {'*O': -7.646083600000001, '*N': -.17228045E+02/2}
-Eads_ref_dft = {'*O': -1.53343974, '*N': -3.11173655, '*H': -1.11587797}
-Eads_ref_rpbe = {'*O': -2.0552055, '*N': -3.6207807, '*H': -1.11587797}
-Ncorr_db = [-0.03508250142669311, 1.0122001719490594]
-Ocorr_db = [0.43857541907825404, 1.0530681561315451]
-
-all_tms = [str(el) for el in Element 
-           if el.is_transition_metal and str(el) \
-           not in ['Ac', 'La', 'Hg', 'Tc', 'Cd'] and el.number < 81]
-all_pairs = [pair for pair in itertools.permutations(all_tms, 2)]
-print(len(all_tms), len(all_pairs))
-
-from pymatgen.analysis.cost import CostAnalyzer, CostDBElements, CostDBCSV
-costdb = CostDBCSV('/home/jovyan/costdb_elements_2021.csv')
-costanalyzer = CostAnalyzer(costdb)
-
+from constants import all_tms, all_pairs, costanalyzer
 
 def filter_ehull(valid_mpids, max_ehull=0.08, return_entries=None):
 

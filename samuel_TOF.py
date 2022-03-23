@@ -9,23 +9,13 @@ import os
 import glob
 import pickle
 import re
-import copy
 import datetime
-from sklearn.metrics import mean_absolute_error as mae
-from scipy.optimize import curve_fit
-import statsmodels.api as sm
 import numpy as np
 import matplotlib.pyplot as plt
-from pymatgen.core.structure import *
 import pandas as pd
-from pymatgen.core.periodic_table import Element
-from matplotlib import colors
 from matplotlib import cm
 
-from pymatgen.analysis.pourbaix_diagram import PourbaixDiagram, PourbaixPlotter
-
 import tqdm
-import json
 import multiprocessing
 
 
@@ -460,6 +450,8 @@ rxn_labels_latex = {
 }
 
 def extrapolate_tof(Eads_N, Eads_O, data):
+    # get an explicit value for the log(TOF) from the 
+    # volcano maps using the N (Eads_N) and O (Eads_O) adsorption energies
     v1 = np.array([Eads_N, Eads_O])
     dists = []
     for entry in data:
@@ -468,6 +460,8 @@ def extrapolate_tof(Eads_N, Eads_O, data):
     return data[dists.index(min(dists))]['ratelog']
 
 def get_distance_TOF(x, y, a,b,c,pt1,pt2):
+    # get the Euclidean distance of a datapoint 
+    # in EadsN and EadsO space from a particular line
     if y > pt2[1]:
         d = np.linalg.norm(np.array(pt2)-np.array([x,y]))
 
@@ -488,6 +482,9 @@ from scipy.spatial import ConvexHull
 from scipy.spatial import Delaunay
 
 def select_N2(p):
+    
+    # points need to build the convex hull representing the
+    # space containing N2 selectivity for V = 0, 0.1 and 0.2 V
 
     N2_pos = [[-5.679717795709167, -5.054219236843885],
               [-6.73278473933591, -6.5263521776805415],
@@ -520,6 +517,9 @@ def select_N2(p):
 
 def select_NH3(p):
 
+    # points need to build the convex hull representing the
+    # space containing NH3 selectivity for V = 0, 0.1 and 0.2 V
+
     NH3_pos = [[-5.811320754716982, -5.861168384879726],
                [-6.042767295597485, -5.586254295532646],
                [-5.101886792452831, -4.393127147766323],
@@ -531,15 +531,3 @@ def select_NH3(p):
 
     hull = Delaunay(np.array(NH3_pos))
     return hull.find_simplex(p)>=0
-
-
-
-
-# Load condensed plot data
-import sys
-cwd = os.getcwd()
-sys.path.append(cwd.replace(cwd.split('/')[-1], ''))
-
-
-# with open("/home/joyvan/repos/nitrate/NO3_heatmap_files/all-condensed-plot-data-h2o-corrected_24-jul-2020.pckl", "rb") as f:
-#     condensed_plot_data = pickle.load(f)
