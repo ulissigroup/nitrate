@@ -16,3 +16,7 @@ https://github.com/Open-Catalyst-Project/ocp
 and the following manuscript:
 
 Chanussot, L., Das, A., Goyal, S., Lavril, T., Shuaibi, M., Riviere, M., Tran, K., Heras-Domingo, J., Ho, C., Hu, W., Palizhati, A., Sriram, A., Wood, B., Yoon, J., Parikh, D., Zitnick, C. L., & Ulissi, Z. (2021). Open Catalyst 2020 (OC20) Dataset and Community Challenges. ACS Catalysis, 11(10), 6059–6072. https://doi.org/10.1021/acscatal.0c04525
+
+In order to use the lmdb_generator.py module, you must install OCP. Follow the instructions here:
+
+https://github.com/Open-Catalyst-Project/ocp
