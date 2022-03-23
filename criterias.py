@@ -8,11 +8,14 @@ from matplotlib.ticker import FixedLocator, FormatStrFormatter
 from matplotlib import patches
 from constants import all_tms, all_pairs, costanalyzer
 
+fdir = 'datasets/materials_dataset/*'
+
 def filter_ehull(valid_mpids, max_ehull=0.08, return_entries=None):
+    
+    # Filter out mpids or auids if the energy above hull is above max_ehull
 
     tier_ehull_dict = {}
     entries_list = []
-    fdir = '/home/jovyan/potential_catalysts/all_bimetallics_db_screen/tier0_72761_w_gpbx_entry_ids_activity/*'
     for f in glob.glob(fdir):
         if any(el in f.split('/')[-1] for el in ['Hg', 'Cd', 'Tc', 'La', 'Ac']):
             continue
@@ -35,8 +38,9 @@ def filter_ehull(valid_mpids, max_ehull=0.08, return_entries=None):
 
 def filter_pbx_stable(valid_mpids, gpbx=0.5, phrange=[6,8], vrange=0, include_pbx_stable=True):
     
+    # Filter out mpids or auids if the Pourbaix decomposition energy is above energy above gpbx
+    
     tier2_dict = {}
-    fdir = '/home/jovyan/potential_catalysts/all_bimetallics_db_screen/tier0_72761_w_gpbx_entry_ids_activity/*'
     for f in glob.glob(fdir):
         if any(el in f.split('/')[-1] for el in ['Hg', 'Cd', 'Tc', 'Ac', 'La']):
             continue
@@ -59,9 +63,9 @@ def filter_pbx_stable(valid_mpids, gpbx=0.5, phrange=[6,8], vrange=0, include_pb
 
 def filter_active(valid_mpids, check_existing=False, vrange=None):
     
-    # What are all the materials that are within the region of 'high' activity (Tier 3)
+    # What are all the materials that are within the region of 'high' activity
+    
     tier3_dict = {}
-    fdir = '/home/jovyan/potential_catalysts/all_bimetallics_db_screen/tier0_72761_w_gpbx_entry_ids_activity/*'
     for f in glob.glob(fdir):
         if any(el in f.split('/')[-1] for el in ['Hg', 'Cd', 'Tc', 'Ac', 'La']):
             continue
@@ -119,11 +123,11 @@ def filter_active(valid_mpids, check_existing=False, vrange=None):
 
 def filter_selectivity(valid_mpids, return_entry_id_to_hatch_dict=False, exclude_NH3_only=False):
     
-    # Selectivity (Tier 4)
+    # Filter materials that select for N2 (or NH3)
+    
     bool_hatch_dict = {(True, False): '\\\\', (False, True): '////', (True, True): 'xx', (False, False): ''}
     tier4_dict, mpid_entry_dict = {}, {}
     entry_id_to_hatch_dict = {}
-    fdir = '/home/jovyan/potential_catalysts/all_bimetallics_db_screen/tier0_72761_w_gpbx_entry_ids_activity/*'
     for f in glob.glob(fdir):
         if any(el in f.split('/')[-1] for el in ['Hg', 'Cd', 'Tc', 'Ac', 'La']):
             continue
@@ -188,10 +192,9 @@ def filter_selectivity(valid_mpids, return_entry_id_to_hatch_dict=False, exclude
 
 def filter_cost(valid_mpids):
     
-    # Cost (Tier 5)
+    # Filter out materials costing more than $500/kg
 
     tier5_dict = {}
-    fdir = '/home/jovyan/potential_catalysts/all_bimetallics_db_screen/tier0_72761_w_gpbx_entry_ids_activity/*'
     for f in glob.glob(fdir):
 
         if any(el in f.split('/')[-1] for el in ['Hg', 'Cd', 'Tc', 'Ac', 'La']):
@@ -213,9 +216,9 @@ def filter_cost(valid_mpids):
 
 def filter_size(valid_mpids, n=35):
     
-    # size
+    # filter out bulks with number of atoms greater than n
+    
     tier_size_dict = {}
-    fdir = '/home/jovyan/potential_catalysts/all_bimetallics_db_screen/tier0_72761_w_gpbx_entry_ids_activity/*'
     for f in glob.glob(fdir):
 
         if any(el in f.split('/')[-1] for el in ['Hg', 'Cd', 'Tc', 'Ac', 'La']):
@@ -235,6 +238,8 @@ def filter_size(valid_mpids, n=35):
 
 def plot_gridmap(tier1_pairs, tier2_pairs, tier3_pairs, tier4_pairs, 
                  tier5_pairs, hatch_dict, hatch_tier_order):
+    
+    # plots colored gridmap showing which pair of elements have passed all the given tiers.
 
     tick_range = range(0, len(all_tms))
     ellist = all_tms
@@ -342,24 +347,15 @@ def plot_gridmap(tier1_pairs, tier2_pairs, tier3_pairs, tier4_pairs,
             ax.add_patch(patches.Rectangle((x-0.5, y-0.5), 1, 1, hatch=hatch,
                                            fill=False, snap=False, color='r'))
 
-    #         comps = [mpid_to_comp[mpid] for mpid in comp_grid[x][y]]
-    #         if not comps:
-    #             ax.add_patch(patches.Rectangle((x-0.5, y-0.5), 1, 1, fill=False, snap=False, color='k'))
-    #             continue
-
     for x, row in enumerate(all_tof_dists):
         for y, hatch in enumerate(row):
             ax.add_patch(patches.Rectangle((x-0.5, y-0.5), 1, 1, fill=False, snap=False, color='k'))
 
     plt.clim(0,100)
-    #     cbar = plt.colorbar(im)
     plt.plot([-1.5, 29], [-1.5, 29], 'k-', linewidth=3, )
     print(plt.xlim(), plt.ylim())
     plt.xlim(-0.5,25.5)
     plt.ylim(-1.5, 26.5)
     print(plt.xlim(), plt.ylim())
-
-    # plt.ylim([-1.5, 29])
-    # plt.xlim([-0.5, 28.5])
-
+    
     return plt

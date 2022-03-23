@@ -4,10 +4,11 @@ from ocpmodels.preprocessing import AtomsToGraphs
 from ocpmodels.datasets.trajectory_lmdb import TrajectoryLmdbDataset
 from ocpmodels.datasets.single_point_lmdb import SinglePointLmdbDataset
 import sys, os, glob
-sys.path.append(os.getcwd())
 from other_functions import str_to_hkl
-
 import lmdb, pickle, torch, string, random
+
+sys.path.append(os.getcwd())
+
 
 def rid_generator(r=random):
     return ''.join([r.choice(string.ascii_letters
