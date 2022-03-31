@@ -8,9 +8,9 @@ from matplotlib.ticker import FixedLocator, FormatStrFormatter
 from matplotlib import patches
 from constants import all_tms, all_pairs, costanalyzer
 
-fdir = 'datasets/materials_dataset/*'
 
-def filter_ehull(valid_mpids, max_ehull=0.08, return_entries=None):
+def filter_ehull(valid_mpids, max_ehull=0.08, return_entries=None, 
+                 fdir='datasets/materials_dataset/*'):
     
     # Filter out mpids or auids if the energy above hull is above max_ehull
 
@@ -36,7 +36,8 @@ def filter_ehull(valid_mpids, max_ehull=0.08, return_entries=None):
     else:
         return tier_ehull_dict, tier_ehull_pairs
 
-def filter_pbx_stable(valid_mpids, gpbx=0.5, phrange=[6,8], vrange=0, include_pbx_stable=True):
+def filter_pbx_stable(valid_mpids, gpbx=0.5, phrange=[6,8], vrange=0, 
+                      include_pbx_stable=True, fdir='datasets/materials_dataset/*'):
     
     # Filter out mpids or auids if the Pourbaix decomposition energy is above energy above gpbx
     
@@ -61,7 +62,8 @@ def filter_pbx_stable(valid_mpids, gpbx=0.5, phrange=[6,8], vrange=0, include_pb
             tier2_pairs.append(p)
     return tier2_dict, tier2_pairs
 
-def filter_active(valid_mpids, check_existing=False, vrange=None):
+def filter_active(valid_mpids, check_existing=False, 
+                  vrange=None, fdir='datasets/materials_dataset/*'):
     
     # What are all the materials that are within the region of 'high' activity
     
@@ -121,7 +123,8 @@ def filter_active(valid_mpids, check_existing=False, vrange=None):
             tier3_pairs.append(p)
     return tier3_dict, tier3_pairs
 
-def filter_selectivity(valid_mpids, return_entry_id_to_hatch_dict=False, exclude_NH3_only=False):
+def filter_selectivity(valid_mpids, return_entry_id_to_hatch_dict=False, 
+                       exclude_NH3_only=False, fdir='datasets/materials_dataset/*'):
     
     # Filter materials that select for N2 (or NH3)
     
@@ -190,7 +193,7 @@ def filter_selectivity(valid_mpids, return_entry_id_to_hatch_dict=False, exclude
     else:
         return tier4_dict, tier4_pairs, hatch_dict
 
-def filter_cost(valid_mpids):
+def filter_cost(valid_mpids, fdir='datasets/materials_dataset/*'):
     
     # Filter out materials costing more than $500/kg
 
@@ -214,7 +217,7 @@ def filter_cost(valid_mpids):
             tier5_pairs.append(p)
     return tier5_dict, tier5_pairs
 
-def filter_size(valid_mpids, n=35):
+def filter_size(valid_mpids, n=35, fdir='datasets/materials_dataset/*'):
     
     # filter out bulks with number of atoms greater than n
     
